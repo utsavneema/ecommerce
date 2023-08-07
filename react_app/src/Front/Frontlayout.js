@@ -42,7 +42,7 @@ const Frontlayout = (props) => {
 
   const dashboardClick = () => {
     if (userDetails && userDetails.role === 'Admin') {
-      navigate('/admin/adminpage');
+      navigate('/admin/report');
     } else {
       navigate('/user');
     }
@@ -58,6 +58,12 @@ const Frontlayout = (props) => {
     if (userDetails) {navigate('/');}
   };  
 
+  const orderClick = (event) => {
+    if (userDetails && userDetails.role === 'Admin') {
+      navigate('/admin/adminpage');
+    }
+  };
+
   return (
     <div>
       <Navbar expand="lg" className="bg-body-tertiary pb-0" style={{ backgroundColor: "#cbcbcb" }}>
@@ -70,12 +76,13 @@ const Frontlayout = (props) => {
             <Nav className="me-auto">
               {userDetails && userDetails.role === 'Admin' && (
                 <>
-                 <Nav.Link onClick={productsClick} style={{ marginRight: "1rem",marginLeft:"1rem", color: "white" }}>
-                   Products
-                 </Nav.Link>
-                  <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white" }}>
+                 
+                  <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white", marginLeft:"1rem" }}>
                     Dashboard
                   </Nav.Link>
+                  <Nav.Link onClick={orderClick} style={{ marginRight: "1rem",marginLeft:"0.5rem", color: "white" }}>
+                   Order List
+                 </Nav.Link>
                   <Nav.Link onClick={productListClick} style={{ marginRight: "1rem", color: "white" }}>
                     Product List
                   </Nav.Link>
