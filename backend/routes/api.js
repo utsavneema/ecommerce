@@ -72,40 +72,6 @@ function dbDelete(sql, params) {
   });
 }
 
-// router.post("/pay", async (req, res) => {
-//   try {
-//     const totalAmount = _.get(req, "body.totalAmount")
-//     const orderId = _.get(req, "body.orderId")
-//     const paymentStatus = _.get(req, "body.paymentStatus")
-//     console.log(totalAmount, orderId, paymentStatus, );
-//     // const { totalAmount, orderId,  paymentStatus } = req.body;
-//     // console.log(req.body);
-//     const amountInCents = totalAmount * 100;
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: amountInCents,
-//       currency: "inr",
-//       payment_method_types: ["card"],
-//       metadata: {
-//         orderId: orderId,
-//         paymentStatus: paymentStatus,
-//       },
-//     });
-//     const clientSecret = paymentIntent.client_secret;
-//     const paymentId = paymentIntent.id;
-
-//     // console.log(paymentId, "-------------------------------------");
-
-//     let sql = 'insert into payment (payment_id, order_id) values (?, ?)' 
-//     const payment = await dbInsert(sql, [paymentId,  orderId])
-//     res.json({ clientSecret, paymentId, message: "Payment Initiated" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Internal server error" });
-//   }
-// });
-
-// Assuming you have properly set up your express app and Stripe API key.
-// Import necessary modules, initialize your app and set up your routes.
 
 router.post("/pay", async (req, res) => {
   try {
@@ -731,7 +697,7 @@ router.post("/order-details", authMiddleWare, async function (req, res, next) {
   const address = _.get(req, "body.address");
   const status = _.get(req, "body.status")
   const items = _.get(req, "body.items");
-  const placedOn = moment().format();
+  const placedOn = moment().format("MMM Do YY");
   const userId = req.userDetails.id; 
   // console.log(userId);
 
@@ -871,6 +837,20 @@ router.put('/complete-order', authMiddleWare, async function (req, res, next) {
     return res.status(500).json({ status: false, error: 'Failed to complete order' });
   }
 });
+//************************************************************************************************** */
+router.get("/order-chart-data", async function (req, res, next){
+  try {
+    let sql = 'select DATE(oders.placed_on) as order_date, SUM(oder_line_items.quantity * variants.price) as total_amount from oder_line_items left join oders on oder_line_items.oder_id = oders.oder_id left join variants on oder_line_items.variant_id = variants.id group by DATE(oders.placed_on)'
+
+    const chartData = await dbSelect(sql);
+
+    return res.status(200).json({status: true, chartData});
+  }
+  catch (error) {
+    console.log(error);
+    return res.status(500).json({ status: false, error: "Failed to fetch order chart data" });
+  }
+})
 
 module.exports = router;
 
