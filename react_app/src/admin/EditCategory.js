@@ -57,7 +57,7 @@ const EditCategory = () => {
       <Navbarr>
         <div className="d-flex justify-content-center align-items-center" style={{ height: '60vh', backgroundColor: '#cbcbcb' }}>
           <Card style={{ width: '400px' }}>
-            <Card.Header as="h5">Update your Tags</Card.Header>
+            <Card.Header as="h5">Update Category</Card.Header>
             <Card.Body>
               <Form onSubmit={handleSubmit}>
                 <Form.Group className="mb-3" controlId="tagName">

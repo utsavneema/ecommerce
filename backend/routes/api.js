@@ -3,6 +3,9 @@ const router = express.Router();
 const mysql = require("mysql");
 const moment = require("moment");
 const _ = require("lodash");
+const path = require("path");
+const fs = require("fs");
+const ExcelJs = require('exceljs');
 const jwt = require ('jsonwebtoken')
 const jwtKey = 'hello';
 const stripe = require('stripe')
@@ -697,7 +700,7 @@ router.post("/order-details", authMiddleWare, async function (req, res, next) {
   const address = _.get(req, "body.address");
   const status = _.get(req, "body.status")
   const items = _.get(req, "body.items");
-  const placedOn = moment().format("MMM Do YY");
+  const placedOn = moment().format();
   const userId = req.userDetails.id; 
   // console.log(userId);
 
@@ -840,18 +843,32 @@ router.put('/complete-order', authMiddleWare, async function (req, res, next) {
 //************************************************************************************************** */
 router.get("/order-chart-data", async function (req, res, next){
   try {
-    let sql = 'select DATE(oders.placed_on) as order_date, SUM(oder_line_items.quantity * variants.price) as total_amount from oder_line_items left join oders on oder_line_items.oder_id = oders.oder_id left join variants on oder_line_items.variant_id = variants.id group by DATE(oders.placed_on)'
+    let sql = 'select DATE(oders.placed_on) as order_date, SUM(oder_line_items.quantity * variants.price) as total_amount, COUNT(oders.oder_id) AS total_orders from oder_line_items left join oders on oder_line_items.oder_id = oders.oder_id left join variants on oder_line_items.variant_id = variants.id group by DATE(oders.placed_on)'
 
     const chartData = await dbSelect(sql);
+    
+    const workbook = new ExcelJs.Workbook();
+    const worksheet = workbook.addWorksheet("OrderData")
 
-    return res.status(200).json({status: true, chartData});
+    worksheet.addRow(["Order Date", "Total Amount", "Total Orders"])
+    chartData.map((data)=>{
+      worksheet.addRow([
+        data.order_date,
+        data.total_amount,
+        data.total_orders,
+      ]);
+    });
+
+    const filePath = path.join(__dirname, "../public/excelsheets/order-chart.xlsx");
+    await workbook.xlsx.writeFile(filePath);
+
+    return res.status(200).json({status: true, chartData, excelUrl: `/excelsheets/order-chart.xlsx`});
   }
   catch (error) {
     console.log(error);
-    return res.status(500).json({ status: false, error: "Failed to fetch order chart data" });
+    return res.status(500).json({ status: false, error: "Failed to fetch details and file" });
   }
 })
-
 module.exports = router;
 
 //-----------------------------------------------to get all ids-----------------
