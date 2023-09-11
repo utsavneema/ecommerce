@@ -1,16 +1,40 @@
 const express = require("express");
+const app = express()
 const router = express.Router();
+const dotenv = require('dotenv');
 const mysql = require("mysql");
 const moment = require("moment");
 const _ = require("lodash");
 const path = require("path");
 const fs = require("fs");
 const ExcelJs = require('exceljs');
-const jwt = require ('jsonwebtoken')
+const jwt = require('jsonwebtoken')
 const jwtKey = 'hello';
 const stripe = require('stripe')
-('sk_test_51NaXjeSBT2ulkWI7OTmosn061Duqw1fhlJcVxdMjQckz2LUqllqoCU4QtsyGWyfIHtQVOsmw1FAGmilRvHj27Mzh00wdnhIyar')
+  ('sk_test_51NaXjeSBT2ulkWI7OTmosn061Duqw1fhlJcVxdMjQckz2LUqllqoCU4QtsyGWyfIHtQVOsmw1FAGmilRvHj27Mzh00wdnhIyar')
 // (process.env.STRIPE_SECRET_KEY);
+const mg = require('mailgun-js');
+dotenv.config()
+const throttle = require("express-throttle");
+const cron = require('node-cron');
+
+const timeout = require("connect-timeout")
+router.use(timeout('30s'));
+
+router.get('/test', async (req, res) => {
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(true);
+    }, 10000);
+  });
+
+  res.status(200).json({ status: true, message: 'hello world' });
+
+});
+
+// domain = sandbox2446d952854d43ec98d7fd88284580ca.mailgun.org
+//key = c3bbc932df4bd3883a93bb71c1e49f00-28e9457d-aa54e458
+
 
 const con = mysql.createConnection({
   host: "localhost",
@@ -26,6 +50,7 @@ con.connect((err) => {
   }
   console.log("Connected to the database!");
 });
+
 
 function dbSelect(sql, param) {
   return new Promise((resolve) => {
@@ -46,34 +71,60 @@ function dbSelect(sql, param) {
 function dbInsert(sql, params) {
   return new Promise((resolve, reject) => {
     con.query(
-      sql, 
-      params, 
+      sql,
+      params,
       (error, result) => {
-      if (error) {
-        console.error(error);
-        reject(error);
-      } else {
-        resolve(result);
-      }
-    });
+        if (error) {
+          console.error(error);
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      });
   });
 }
 
 function dbDelete(sql, params) {
   return new Promise((resolve, reject) => {
     con.query(
-      sql, 
-      params, 
+      sql,
+      params,
       (error, result) => {
-      if (error) {
-        console.error(error);
-        reject(error);
-      } else {
-        resolve(result);
-      }
-    });
+        if (error) {
+          console.error(error);
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      });
   });
 }
+
+
+
+const mailgun = () =>
+  mg({
+    apiKey: 'key-0bc318c7e1172e00ea27a4387cbc7a86',
+    domain: 'sandbox2446d952854d43ec98d7fd88284580ca.mailgun.org',
+  });
+router.post('/send-email', (req, res) => {
+  const { sender, receiver, subject, body } = req.body;
+
+  mailgun().messages().send({
+    from: `${sender} <utsav360neema@gmail.com>`,
+    to: receiver,
+    subject: subject,
+    text: body
+  }, (error, body) => {
+    if (error) {
+      console.log(error);
+      return res.status(500).json({ status: false, message: 'Failed to send email' });
+    } else {
+      console.log(body);
+      return res.status(200).json({ status: true, message: 'Email sent successfully' });
+    }
+  });
+});
 
 
 router.post("/pay", async (req, res) => {
@@ -81,7 +132,7 @@ router.post("/pay", async (req, res) => {
     const totalAmount = _.get(req, "body.totalAmount");
     const orderId = _.get(req, "body.orderId");
     const paymentStatus = "pending";
-    
+
     const amountInCents = totalAmount * 100;
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
@@ -92,11 +143,11 @@ router.post("/pay", async (req, res) => {
         paymentStatus: paymentStatus,
       },
     });
-    
+
     const clientSecret = paymentIntent.client_secret;
     const paymentId = paymentIntent.id;
 
-    let sql = 'insert into payment (payment_id, payment_status, order_id) values (?, ?, ?)'; 
+    let sql = 'insert into payment (payment_id, payment_status, order_id) values (?, ?, ?)';
     const payment = await dbInsert(sql, [paymentId, paymentStatus, orderId]);
 
     res.json({ clientSecret, paymentId, message: "Payment Initiated" });
@@ -130,13 +181,13 @@ router.post("/register", async function (req, res, next) {
   try {
     let existingSql = 'select id from user where email =?'
     let existingUser = await dbSelect(`${existingSql}`, [email]);
-    if (existingUser.length >0) {
-        return res.status(401).json({status: false, error: "already exists"})
+    if (existingUser.length > 0) {
+      return res.status(401).json({ status: false, error: "already exists" })
     }
 
     let sql = "insert into user (name, email, password, role) values (?, ?, ?, ?)";
     const user = await dbInsert(`${sql}`, [name, email, password, role]);
-    return res.status(200).json({ status:true, message: "user inserted" });
+    return res.status(200).json({ status: true, message: "user inserted" });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ status: false, error: "Failed to insert user" });
@@ -149,15 +200,15 @@ router.post("/login", async function (req, res, next) {
   const password = _.get(req, "body.password");
 
   try {
-    let sql = "SELECT * FROM user WHERE email = ? AND password = ?"; 
+    let sql = "SELECT * FROM user WHERE email = ? AND password = ?";
     const user = await dbSelect(sql, [email, password]);
 
     if (user.length === 0) {
       return res.status(401).json({ status: false, message: 'Invalid credentials' });
     }
-    const token = jwt.sign({ id: user[0].id}, jwtKey);
+    const token = jwt.sign({ id: user[0].id }, jwtKey);
 
-    return res.status(200).json({ status: true, token: token, user: user[0] }); 
+    return res.status(200).json({ status: true, token: token, user: user[0] });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ status: false, error: "Failed to perform login" });
@@ -167,16 +218,16 @@ router.post("/login", async function (req, res, next) {
 
 async function authMiddleWare(req, res, next) {
   try {
-    const token = _.get(req, 'headers.authorization', ''); 
+    const token = _.get(req, 'headers.authorization', '');
     // console.log(token, 'tokennnnnnn');
 
     if (!token) {
-      return res.status(401).json("token nahi mila"); 
+      return res.status(401).json("token nahi mila");
     } else {
       const decodedToken = jwt.verify(token, jwtKey);
       // console.log(decodedToken, "decoded");
-      
-      let sql = 'SELECT * FROM user WHERE id = ?'; 
+
+      let sql = 'SELECT * FROM user WHERE id = ?';
       const users = await dbSelect(sql, [decodedToken.id]);
 
       const user = users[0];
@@ -186,30 +237,31 @@ async function authMiddleWare(req, res, next) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const newUser = { ...user, password:undefined };
+      const newUser = { ...user, password: undefined };
       // console.log(newUser);
-      req.userDetails = newUser; 
+      req.userDetails = newUser;
       next();
     }
   } catch (error) {
     console.log(error);
-    return res.status(401).json("Invalid token."); 
+    return res.status(401).json("Invalid token.");
   }
 }
 
 router.get('/auth', authMiddleWare, (req, res) => {
-  const userDetails = req.userDetails; 
+  const userDetails = req.userDetails;
   // console.log(userDetails);
   return res.json({ status: true, userDetails });
 });
 //***************************************************************************** */
 
 //-------------------------------------insert tag------------------
-router.post('/admin/add-tag', async function (req, res, next) {
+
+router.post('/admin/add-tag', throttle({ rate: "2/min" }), async function (req, res, next) {
   const name = _.get(req, 'body.name');
-  try{
+  try {
     let sql = 'INSERT INTO tags (name) VALUES (?)'
-    const addTag = await dbInsert (`${sql}`, [name])
+    const addTag = await dbInsert(`${sql}`, [name])
     return res.status(200).json({ status: true });
   } catch (error) {
     console.log(error);
@@ -217,6 +269,7 @@ router.post('/admin/add-tag', async function (req, res, next) {
       .status(500)
       .json({ status: false, error: "Failed to insert tag" });
   }
+  //whenever throttle limit exceed hogi then response me code 429 aega.
 });
 //************************************************************************************ */
 
@@ -224,11 +277,11 @@ router.post('/admin/add-tag', async function (req, res, next) {
 router.put('/admin/update-tag', async function (req, res, next) {
   const tagId = _.get(req, 'query.tagId');
   const newName = _.get(req, 'body.name');
-  try{
+  try {
     let sql = 'UPDATE tags SET name = ? WHERE id = ?'
-    const updateTag = await dbInsert (`${sql}`, [newName, tagId]) 
+    const updateTag = await dbInsert(`${sql}`, [newName, tagId])
     return res.status(200).json({ status: true, message: 'Tag updated successfully' });
-  }catch (error) {
+  } catch (error) {
     console.log(error);
     return res
       .status(500)
@@ -240,7 +293,7 @@ router.put('/admin/update-tag', async function (req, res, next) {
 router.delete('/admin/delete-tag', async function (req, res, next) {
   const tagId = _.get(req, 'query.tagId');
   // const newName = _.get(req, 'body.name');
-  try{
+  try {
     let sql = 'DELETE from tags WHERE id = ?'
     const deleteTag = await dbDelete(`${sql}`, tagId)
     return res.status(200).json({ status: true, message: 'Tag deleted successfully' });
@@ -252,32 +305,29 @@ router.delete('/admin/delete-tag', async function (req, res, next) {
   }
 });
 //------------------------------------------------------------------------------------
-
 router.post('/admin/add-category', async function (req, res, next) {
   const name = _.get(req, 'body.name');
-  try{
+  try {
     let sql = 'INSERT INTO category (name) VALUES (?)'
-    const addCategory = await dbInsert (`${sql}`, [name])
+    const addCategory = await dbInsert(`${sql}`, [name])
     return res.status(200).json({ status: true });
   } catch (error) {
     console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: "Failed to insert category" });
+    return res.status(500).json({ status: false, error: "Failed to insert category" });
   }
 });
 //-------------------------------------------------------------------
 router.get("/admin/category-details", async function (req, res, next) {
   // const tagId = _.get(req, 'body.tagId');
   const categoryId = _.get(req, "query.categoryId");
-  try{
+  try {
     let sql = "SELECT * FROM category WHERE id = ?"
-    const categoryDetails = await dbSelect (`${sql}`[
+    const categoryDetails = await dbSelect(`${sql}`[
       categoryId
     ])
-      const categoryData = results[0];
-      return res.status(200).json({ status: true, categoryDetails });
-  }catch (error) {
+    const categoryData = results[0];
+    return res.status(200).json({ status: true, categoryDetails });
+  } catch (error) {
     console.log(error);
     return res
       .status(500)
@@ -287,12 +337,12 @@ router.get("/admin/category-details", async function (req, res, next) {
 //--------------------------------------------------------------------
 
 //---------------------------------------------------------------------------------
-router.put("/admin/update-category",  async function (req, res, next) {
+router.put("/admin/update-category", async function (req, res, next) {
   const categoryId = _.get(req, "query.categoryId");
   const newName = _.get(req, "body.name");
-  try{
+  try {
     let sql = "UPDATE category SET name = ? WHERE id = ?"
-    const updateCategory = await dbInsert (`${sql}`, [
+    const updateCategory = await dbInsert(`${sql}`, [
       newName, categoryId
     ])
     return res.status(200).json({ status: true, message: "Category updated successfully" })
@@ -300,7 +350,7 @@ router.put("/admin/update-category",  async function (req, res, next) {
   } catch (error) {
     console.log(error);
     return res.status(500).json({ status: false, error: "Failed to update" });
-  } 
+  }
 });
 //---------------------------------------------------------------------------------
 
@@ -308,13 +358,13 @@ router.put("/admin/update-category",  async function (req, res, next) {
 router.delete("/admin/delete-category", async function (req, res, next) {
   const categoryId = _.get(req, "query.categoryId");
   // const newName = _.get(req, 'body.name');
-  try{
+  try {
     let sql = "DELETE from category WHERE id = ?"
-    let categoryDelete = await dbDelete (`${sql}`, [categoryId])
+    let categoryDelete = await dbDelete(`${sql}`, [categoryId])
     return res
-        .status(200)
-        .json({ status: true, message: "Category deleted successfully" })
-  }catch (error) {
+      .status(200)
+      .json({ status: true, message: "Category deleted successfully" })
+  } catch (error) {
     console.log(error);
     return res
       .status(500)
@@ -345,9 +395,9 @@ router.post("/admin/add-product", async function (req, res, next) {
   const categoryId = _.get(req, "body.categoryId");
   const image = _.get(req, "body.image", "");
 
-  try { 
-    let sql = 
-    'insert into products (name, description, created_at, updated_at, tag, image, category) VALUES (?,?,?,?,?,?,?)'
+  try {
+    let sql =
+      'insert into products (name, description, created_at, updated_at, tag, image, category) VALUES (?,?,?,?,?,?,?)'
     let variantSql = "INSERT INTO variants (variant_title, price, product_id) VALUES (?,?,?)"
     const productResult = await dbInsert(`${sql}`,
       [
@@ -391,24 +441,24 @@ router.get("/admin/site-data", async function (req, res, next) {
 
     let tagSql = `select * from tags`
     const tags = await dbSelect(tagSql);
-    
-    return res.status(200).json({ status: true, categorylist, tags});
+
+    return res.status(200).json({ status: true, categorylist, tags });
   } catch (error) {
     console.log(error);
     return res
       .status(500)
       .json({ status: false, error: "Failed to fetch product details" });
-      
+
   }
 });
 //********************************************************************************************************** */
 
-//---------------------------------get productdetails (Dynmaic Query)----------------------------------------
+//---------------------------------get productdetails (Dynamic Query)----------------------------------------
 router.post("/admin/product-card-list", async function (req, res, next) {
   const page = _.get(req, "body.page");
   const category = _.get(req, "body.category");
   const selectedTags = _.get(req, "body.selectedTags");
-  
+
   const limit = 8;
   const offset = (page - 1) * limit;
 
@@ -434,7 +484,7 @@ router.post("/admin/product-card-list", async function (req, res, next) {
     sqlCount = `${sql.replace("*", "count(*) as count ")}`;
 
     sql = `${sql} LIMIT ${limit} OFFSET ${offset}`;
-    
+
     let productDetails = await dbSelect(sql);
     const allCount = await dbSelect(sqlCount);
 
@@ -482,28 +532,27 @@ router.post("/admin/product-card-list", async function (req, res, next) {
       error: "Failed to fetch product details"
     });
   }
-}) 
+})
 //---**************************************************************************************************************-
-
 router.get("/admin/product-list", async function (req, res, next) {
   try {
     let sql = "SELECT * FROM products"
-    const productDetails = await dbSelect (`${sql}`)
+    const productDetails = await dbSelect(`${sql}`)
 
     const productIds = productDetails.map((product) => product.product_id);
     const variantsql = 'select * from variants where product_id IN (?)';
     const variantList = await dbSelect(variantsql, [productIds]);
 
     const tagIds = productDetails
-    .map((product) => product.tag)
-    .filter((tagId) => tagId !== null && tagId !== "")
-    .map((tagId) => tagId.split(","))
-    .flat();
+      .map((product) => product.tag)
+      .filter((tagId) => tagId !== null && tagId !== "")
+      .map((tagId) => tagId.split(","))
+      .flat();
 
 
     const tagSql = "SELECT * FROM tags WHERE id IN (?)";
     const tagList = await dbSelect(tagSql, [tagIds]);
-    
+
 
     const categoryIds = productDetails.map((product) => product.category);
     const categorySql = "SELECT * FROM category WHERE id IN (?)";
@@ -570,7 +619,7 @@ router.get("/admin/product-detail", async function (req, res, next) {
   try {
     const productId = _.get(req, "query.productId");
     let sql = "SELECT * FROM products WHERE product_id = ?"
-    const productDetail = await dbSelect (`${sql}`,[productId])
+    const productDetail = await dbSelect(`${sql}`, [productId])
 
     const productIds = productDetail.map((product) => product.product_id);
     const variantsql = 'select * from variants where product_id IN (?)';
@@ -593,33 +642,33 @@ router.get("/admin/product-detail", async function (req, res, next) {
       .map((tagId) => tagId.split(","))
       .flat();
 
-      const tagSql = "SELECT * FROM tags WHERE id IN (?)";
-      const tagList = await dbSelect(tagSql, [tagIds]);
+    const tagSql = "SELECT * FROM tags WHERE id IN (?)";
+    const tagList = await dbSelect(tagSql, [tagIds]);
 
     productDetail.map((product) => {
       const variants = variantList.filter(
         (variant) => variant.product_id === product.product_id
       );
       product.variants = variants;
-      
+
       const productTags = product.tag.split(",").map((r) => parseInt(r));
       const tags = tagList.filter((r) => productTags.includes(r.id));
       product.tags = tags.map((tag) => tag.name);
-    //   let productTag = [];
-    //   if (_.get(product, "tag", "") !== null) {
-    //     productTag = _.get(product, "tag", "")
-    //       .split(",")
-    //       .filter((r) => r !== "")
-    //       .map((r) => parseInt(r));
-    //   }
-    //   const tag = tagList.filter((r) => {
-    //     if (_.includes(productTag, _.get(r, "id", 0))) {
-    //       return true;
-    //     } else {
-    //       return false;
-    //     }
-    //   });
-    //   _.set(product, "tags", tag);
+      //   let productTag = [];
+      //   if (_.get(product, "tag", "") !== null) {
+      //     productTag = _.get(product, "tag", "")
+      //       .split(",")
+      //       .filter((r) => r !== "")
+      //       .map((r) => parseInt(r));
+      //   }
+      //   const tag = tagList.filter((r) => {
+      //     if (_.includes(productTag, _.get(r, "id", 0))) {
+      //       return true;
+      //     } else {
+      //       return false;
+      //     }
+      //   });
+      //   _.set(product, "tags", tag);
     });
 
     return res.status(200).json({ status: true, productDetail });
@@ -635,18 +684,18 @@ router.get("/admin/product-detail", async function (req, res, next) {
 router.get("/admin/card-detail", async function (req, res, next) {
   try {
     const productId = _.get(req, "query.id");
-    let sql = "SELECT product_id, name, description, image, category FROM products WHERE product_id = ?"; 
+    let sql = "SELECT product_id, name, description, image, category FROM products WHERE product_id = ?";
     const productDetail = await dbSelect(`${sql}`, [productId]);
 
-    const categoryId = productDetail[0].category; 
+    const categoryId = productDetail[0].category;
 
     const variantsql = 'SELECT * FROM variants WHERE product_id = ?';
     const variantList = await dbSelect(variantsql, [productId]);
 
-    const categoryProductSql = 'SELECT * FROM products WHERE category = ? AND product_id != ?'; 
+    const categoryProductSql = 'SELECT * FROM products WHERE category = ? AND product_id != ?';
     const categoryProducts = await dbSelect(categoryProductSql, [categoryId, productId]);
 
-    productDetail[0].variants = variantList; 
+    productDetail[0].variants = variantList;
     return res.status(200).json({ status: true, productDetail, categoryProducts });
   } catch (error) {
     console.log(error);
@@ -663,28 +712,28 @@ router.put("/admin/update-product", async function (req, res, next) {
   const selectedTags = _.get(req, "body.selectedTags", "").split(",");
   const variants = _.get(req, "body.variants");
   const newCategory = _.get(req, "body.category");
-  try{
-    
-    let sql = "update products SET name = ?, description = ?, image = ?, tag=?, category =? WHERE product_id = ?"
-    const updateProduct = await dbInsert (`${sql}`, [
-      newName, newDescription, newImage, selectedTags.join(","), newCategory, productId ])
+  try {
 
-    variants.map(async(row) => {
+    let sql = "update products SET name = ?, description = ?, image = ?, tag=?, category =? WHERE product_id = ?"
+    const updateProduct = await dbInsert(`${sql}`, [
+      newName, newDescription, newImage, selectedTags.join(","), newCategory, productId])
+
+    variants.map(async (row) => {
       if (row.id) {
         let variantsSql = "UPDATE variants SET variant_title = ?, price = ? WHERE id = ?"
         let title = _.get(row, "variant_title", "")
         let price = _.get(row, "price", 0)
 
-      let updateVariants = await dbInsert(`${variantsSql}`, [title, price, row.id])
+        let updateVariants = await dbInsert(`${variantsSql}`, [title, price, row.id])
       } else {
         let variantssSql = "INSERT INTO variants (variant_title, price, product_id) VALUES (?, ?, ?)"
         let title = _.get(row, "variant_title", "")
         let price = _.get(row, "price", 0)
 
-      let insertVariants = await dbInsert(`${variantssSql}`, [title, price, productId])
+        let insertVariants = await dbInsert(`${variantssSql}`, [title, price, productId])
       }
     });
-  
+
     return res.status(200).json({ status: true, message: "product updated successfully" });
   } catch (error) {
     console.log(error);
@@ -701,9 +750,8 @@ router.post("/order-details", authMiddleWare, async function (req, res, next) {
   const status = _.get(req, "body.status")
   const items = _.get(req, "body.items");
   const placedOn = moment().format();
-  const userId = req.userDetails.id; 
+  const userId = req.userDetails.id;
   // console.log(userId);
-
   try {
     if (!userId) {
       return res.status(404).json({ status: false, error: 'User not found' });
@@ -719,6 +767,7 @@ router.post("/order-details", authMiddleWare, async function (req, res, next) {
       return dbInsert(orderSql, [orderId, item.variantId, item.quantity]);
     });
 
+
     // let paymentSql = 'insert into payment (payment_id, order_id, payment_status) values (?,?,?)'
     // const payment = await dbInsert(paymentSql, [paymentId, orderId, paymentStatus]);
 
@@ -730,14 +779,14 @@ router.post("/order-details", authMiddleWare, async function (req, res, next) {
 });
 
 //*********************************************************************************************** */
-router.get("/order-list", authMiddleWare,  async function (req, res, next) {
+router.get("/order-list", authMiddleWare, async function (req, res, next) {
   const userId = req.userDetails.id;
   // console.log(userId);
   // const placedOn = moment().format();
 
   try {
     let sql = 'select variants.variant_title, variants.price, oders.oder_id, oders.status, oder_line_items.quantity, products.*, payment.payment_status  from oder_line_items left join oders on oder_line_items.oder_id  = oders.oder_id left join variants on oder_line_items.variant_id = variants.id left join products on variants.product_id = products.product_id left join payment ON payment.order_id = oders.oder_id where oders.userid = ? GROUP BY oders.oder_id ;; '
-    const orderList = await dbSelect (sql, [userId])
+    const orderList = await dbSelect(sql, [userId])
     return res.status(200).json({ status: true, orderList });
   } catch (error) {
     console.log(error);
@@ -748,7 +797,7 @@ router.get("/order-list", authMiddleWare,  async function (req, res, next) {
 router.get("/item-details", authMiddleWare, async function (req, res, next) {
   const userId = req.userDetails.id;
   // console.log(userId);
-  const oder_id = req.query.oder_id; 
+  const oder_id = req.query.oder_id;
   // console.log(oder_id);
 
   try {
@@ -764,14 +813,14 @@ router.get("/item-details", authMiddleWare, async function (req, res, next) {
 });
 
 //*************************************************************************************************** */
-router.get ("/all-orders", async function (req, res, next){
+router.get("/all-orders", async function (req, res, next) {
   const oder_id = _.get(req, "query.oder_id")
-  try{
+  try {
     let sql = "select oders.name as username, oders.email, oders.oder_id, oders.status, oders.placed_on, variants.variant_title, variants.price,products.product_id, products.name as productname, products.description, products.image, oder_line_items.quantity  from oders left join oder_line_items on oders.oder_id = oder_line_items.oder_id left join variants on oder_line_items.variant_id = variants.id left join products on variants.product_id = products.product_id GROUP BY oders.oder_id;"
     // "select *from oders left join oder_line_items on oders.oder_id = oder_line_items.id;"
     const allOrders = await dbSelect(sql, [oder_id]);
     return res.status(200).json({ status: true, allOrders });
-  }catch (error) {
+  } catch (error) {
     console.log(error);
     return res.status(500).json({ status: false, error: "Failed to fetch order details" });
   }
@@ -780,7 +829,7 @@ router.get ("/all-orders", async function (req, res, next){
 router.get("/admin/item-details", authMiddleWare, async function (req, res, next) {
   const userId = req.userDetails.id;
   // console.log(userId);
-  const oder_id = req.query.oder_id; 
+  const oder_id = req.query.oder_id;
   // console.log(oder_id);
 
   try {
@@ -799,7 +848,7 @@ router.get("/admin/item-details", authMiddleWare, async function (req, res, next
 router.put('/cancel-order', authMiddleWare, async function (req, res, next) {
   const userId = req.userDetails.id;
   // const oder_id = _.get(req, "query.oder_id");
-  const oder_id = _.get(req,"body.oder_id") 
+  const oder_id = _.get(req, "body.oder_id")
   // console.log(oder_id); 
 
   try {
@@ -821,7 +870,7 @@ router.put('/complete-order', authMiddleWare, async function (req, res, next) {
   // console.log("Received request data:", req.body);
   const userId = req.userDetails.id;
   // console.log(userId);
-  const order_id = req.body.oder_id; 
+  const order_id = req.body.oder_id;
   // console.log(order_id, "*****************************************"); 
 
   try {
@@ -841,17 +890,17 @@ router.put('/complete-order', authMiddleWare, async function (req, res, next) {
   }
 });
 //************************************************************************************************** */
-router.get("/order-chart-data", async function (req, res, next){
+router.get("/order-chart-data", async function (req, res, next) {
   try {
     let sql = 'select DATE(oders.placed_on) as order_date, SUM(oder_line_items.quantity * variants.price) as total_amount, COUNT(oders.oder_id) AS total_orders from oder_line_items left join oders on oder_line_items.oder_id = oders.oder_id left join variants on oder_line_items.variant_id = variants.id group by DATE(oders.placed_on)'
 
     const chartData = await dbSelect(sql);
-    
+
     const workbook = new ExcelJs.Workbook();
     const worksheet = workbook.addWorksheet("OrderData")
 
     worksheet.addRow(["Order Date", "Total Amount", "Total Orders"])
-    chartData.map((data)=>{
+    chartData.map((data) => {
       worksheet.addRow([
         data.order_date,
         data.total_amount,
@@ -862,13 +911,45 @@ router.get("/order-chart-data", async function (req, res, next){
     const filePath = path.join(__dirname, "../public/excelsheets/order-chart.xlsx");
     await workbook.xlsx.writeFile(filePath);
 
-    return res.status(200).json({status: true, chartData, excelUrl: `/excelsheets/order-chart.xlsx`});
+    return res.status(200).json({ status: true, chartData, excelUrl: `/excelsheets/order-chart.xlsx` });
   }
   catch (error) {
     console.log(error);
     return res.status(500).json({ status: false, error: "Failed to fetch details and file" });
   }
 })
+
+const saveFile = async () => {
+  try {
+    let sql = 'select DATE(oders.placed_on) as order_date, SUM(oder_line_items.quantity * variants.price) as total_amount, COUNT(oders.oder_id) AS total_orders from oder_line_items left join oders on oder_line_items.oder_id = oders.oder_id left join variants on oder_line_items.variant_id = variants.id group by DATE(oders.placed_on)';
+
+    const chartData = await dbSelect(sql);
+
+    const workbook = new ExcelJs.Workbook();
+    const worksheet = workbook.addWorksheet("OrderData");
+
+    worksheet.addRow(["Order Date", "Total Amount", "Total Orders"]);
+    chartData.map((data) => {
+      worksheet.addRow([
+        data.order_date,
+        data.total_amount,
+        data.total_orders,
+      ]);
+    });
+
+    const filePath = path.join(__dirname, "../public/excelsheets/order-chart.xlsx");
+    await workbook.xlsx.writeFile(filePath);
+    // console.log('Excel sheet saved successfully:', filePath);
+  } catch (error) {
+    console.error('Error generating and saving Excel sheet:', error);
+  }
+};
+
+// Cron job 
+// cron.schedule('*/45 * * * *', () => {
+//   saveFile();
+//   console.log("file Saved ----------------------------------------------------");
+// });
 module.exports = router;
 
 //-----------------------------------------------to get all ids-----------------

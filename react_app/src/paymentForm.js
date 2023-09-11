@@ -4,8 +4,9 @@ import axios from "axios";
 import { baseUrl, priceFormat } from "./helpers";
 import Frontlayout from "./Front/Frontlayout";
 import { useDispatch, useSelector } from "react-redux";
-import { setPaymentStatus, setPaymentId } from "./redux/slices/paymentSlice";
+// import { setPaymentStatus, setPaymentId } from "./redux/slices/paymentSlice";
 import { useNavigate } from "react-router-dom";
+import EmailTemplate from "./emailTemplate";
 
 const PaymentForm = () => {
   const stripe = useStripe();
@@ -61,6 +62,21 @@ const PaymentForm = () => {
           console.error("ErroRR:", err);
         }
       }
+
+      try {
+        const emailBody = <EmailTemplate />;
+
+        const emailData = { 
+          sender: 'Utsav',
+          receiver: 'utsavneema18@gmail.com', 
+          subject: 'Payment Confirmation', 
+          body: 'order information\n\n' + emailBody,
+        };
+        await axios.post(baseUrl + 'api/send-email', emailData);
+      } catch (error) {
+        console.error('Error sending email:', error);
+      }
+
     } catch (err) {
       console.error(err);
       setErrorMessage("There was an error in payment");
@@ -78,7 +94,7 @@ const PaymentForm = () => {
     await pay();
     navigate('/user');
   };
-  
+
   return (
     <Frontlayout>
       <div style={{ backgroundColor: "#cbcbcb" }}>

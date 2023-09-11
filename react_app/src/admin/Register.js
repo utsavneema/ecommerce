@@ -47,7 +47,7 @@ const Register = () => {
               justifyContent: 'center',
               alignItems: 'center',
               backgroundColor: '#cbcbcb',
-              flexDirection: 'column', // Add this line to center elements vertically
+              flexDirection: 'column', 
             }}
           >
             <h4>Please Enter Details to Register</h4>
