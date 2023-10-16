@@ -24,6 +24,8 @@ import Adminpage from './admin/Adminpage';
 import Orderdetail from './Orderdetail';
 import Orderdetails from './admin/Orderdetails';
 import PaymentForm from './paymentForm';
+import Adminreport from './admin/Adminreport';
+import EmailTemplate from './emailTemplate';
 
 
 function App() {
@@ -51,6 +53,8 @@ function App() {
       <Route path = '/order-detail/:id' element={<Orderdetail/>}></Route>
       <Route path = '/admin/order-details/:id' element = {<Orderdetails/>}></Route>
       <Route path = '/paymentform' element={<PaymentForm/>}></Route>
+      <Route path = '/admin/report' element={<Adminreport/>}></Route>
+      <Route path = '/emailtemplate' element={<EmailTemplate/>}></Route>
 
       {/* <Route path = '/front/front-product' element={<Frontproduct/>}></Route> */}
       <Route path = '/detail/:id' element={<Carddetail/>}></Route>

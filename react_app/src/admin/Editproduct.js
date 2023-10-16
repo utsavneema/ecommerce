@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { baseUrl } from "../helpers";
-import { Form, Container, Button, Table, Badge } from "react-bootstrap";
+import { Form, Container, Button, Table } from "react-bootstrap";
 import Navbarr from "./Navbar";
-import _, { set } from "lodash";
+import _ from "lodash";
 
 const Product = () => {
   const { id } = useParams();
@@ -53,7 +53,8 @@ const Product = () => {
       setImage(productDetail[0].image);
 
       const tagNames = productDetail[0].tag.split(",");
- 
+      console.log(tagNames);
+
       setTags(productDetail[0].tags);
 
       // Store selected tag names in the 'selectedTags' state
@@ -88,7 +89,7 @@ const Product = () => {
   const imageUpload = async (files) => {
     if (files[0] !== undefined) {
       const formData = new FormData();
-      formData.append("userfile", files[0]); 
+      formData.append("userfile", files[0]);
 
       const config = {
         headers: {
@@ -118,7 +119,7 @@ const Product = () => {
   const handleUpdate = async (event) => {
     event.preventDefault();
     try {
-      
+
       // console.log(name, id );
       const response = await axios.put(
         baseUrl + "api/admin/update-product",
@@ -267,7 +268,7 @@ const Product = () => {
               <th>Price</th>
               <th>
                 <Button variant="dark" size="sm" onClick={AddRow}>
-                <i class="fa fa-plus" aria-hidden="true"></i>
+                  <i class="fa fa-plus" aria-hidden="true"></i>
                 </Button>
               </th>
             </tr>
@@ -301,7 +302,7 @@ const Product = () => {
                     size="sm"
                     onClick={() => DeleteRow(index)}
                   >
-                  <i class="fa fa-trash" aria-hidden="true"></i>
+                    <i class="fa fa-trash" aria-hidden="true"></i>
                   </Button>
                 </td>
               </tr>
@@ -309,7 +310,7 @@ const Product = () => {
           </tbody>
         </Table>
         <div className="d-flex justify-content-center">
-          <Button variant="dark" onClick={handleUpdate} style = {{marginBottom:"10px"}}>
+          <Button variant="dark" onClick={handleUpdate} style={{ marginBottom: "10px" }}>
             Update Data
           </Button>
         </div>

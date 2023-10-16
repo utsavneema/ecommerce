@@ -16,7 +16,7 @@ const Frontlayout = (props) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  
+
   useEffect(() => {
     const fetchUserDetail = async () => {
       const userDetails = await dispatch(getUserDetails());
@@ -29,7 +29,7 @@ const Frontlayout = (props) => {
   const cartClick = () => {
     navigate('/front/cart');
   };
- 
+
   const logoClick = () => {
     navigate('/');
   };
@@ -42,7 +42,7 @@ const Frontlayout = (props) => {
 
   const dashboardClick = () => {
     if (userDetails && userDetails.role === 'Admin') {
-      navigate('/admin/adminpage');
+      navigate('/admin/report');
     } else {
       navigate('/user');
     }
@@ -55,14 +55,20 @@ const Frontlayout = (props) => {
   };
 
   const productsClick = () => {
-    if (userDetails) {navigate('/');}
-  };  
+    if (userDetails) { navigate('/'); }
+  };
+
+  const orderClick = (event) => {
+    if (userDetails && userDetails.role === 'Admin') {
+      navigate('/admin/adminpage');
+    }
+  };
 
   return (
     <div>
       <Navbar expand="lg" className="bg-body-tertiary pb-0" style={{ backgroundColor: "#cbcbcb" }}>
         <Container fluid className='navbar-dark' style={{ backgroundColor: '#001f3f' }}>
-          <Link to="/"  style={{ textDecoration: 'none' }}>
+          <Link to="/" style={{ textDecoration: 'none' }}>
             <img src="/logo987.png" width="40" height="40" className="d-inline-block align-top" alt="Logo" />
           </Link>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -70,11 +76,12 @@ const Frontlayout = (props) => {
             <Nav className="me-auto">
               {userDetails && userDetails.role === 'Admin' && (
                 <>
-                 <Nav.Link onClick={productsClick} style={{ marginRight: "1rem",marginLeft:"1rem", color: "white" }}>
-                   Products
-                 </Nav.Link>
-                  <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white" }}>
+
+                  <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white", marginLeft: "1rem" }}>
                     Dashboard
+                  </Nav.Link>
+                  <Nav.Link onClick={orderClick} style={{ marginRight: "1rem", marginLeft: "0.5rem", color: "white" }}>
+                    Order List
                   </Nav.Link>
                   <Nav.Link onClick={productListClick} style={{ marginRight: "1rem", color: "white" }}>
                     Product List
@@ -83,14 +90,14 @@ const Frontlayout = (props) => {
               )}
 
               {userDetails && userDetails.role === 'User' && (
-                 <>
-                 <Nav.Link onClick={productsClick} style={{ marginRight: "1rem",marginLeft:"1rem", color: "white" }}>
-                   Products
-                 </Nav.Link>
-                 <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white" }}>
-                   Dashboard
-                 </Nav.Link>
-               </>
+                <>
+                  <Nav.Link onClick={productsClick} style={{ marginRight: "1rem", marginLeft: "1rem", color: "white" }}>
+                    Products
+                  </Nav.Link>
+                  <Nav.Link onClick={dashboardClick} style={{ marginRight: "1rem", color: "white" }}>
+                    Dashboard
+                  </Nav.Link>
+                </>
               )}
             </Nav>
             <Form className="d-flex ms-auto">
@@ -98,14 +105,14 @@ const Frontlayout = (props) => {
               <Button variant="outline-info" style={{ marginTop: "10px", marginBottom: "10px" }}>Search</Button>
             </Form>
             <Nav className="me-2">
-      <span style={{ display: "flex", alignItems: "center", marginLeft: "1rem" }}>
-        <Button style={{ width: "3rem", height: "3rem" }} variant="outline-light" className="rounded-circle" onClick={cartClick}>
-          <i className="fa fa-shopping-cart" aria-hidden="true"></i> 
-        </Button>
-        <span style={{ marginLeft: "-10px", backgroundColor: "green", color: "white", borderRadius: "50%", padding: "4px", fontSize: "12px", minWidth: "20px", textAlign: "center", marginRight: "15px" }}>{items.length}</span>
-      </span>
-    </Nav>
-            
+              <span style={{ display: "flex", alignItems: "center", marginLeft: "1rem" }}>
+                <Button style={{ width: "3rem", height: "3rem" }} variant="outline-light" className="rounded-circle" onClick={cartClick}>
+                  <i className="fa fa-shopping-cart" aria-hidden="true"></i>
+                </Button>
+                <span style={{ marginLeft: "-10px", backgroundColor: "green", color: "white", borderRadius: "50%", padding: "4px", fontSize: "12px", minWidth: "20px", textAlign: "center", marginRight: "15px" }}>{items.length}</span>
+              </span>
+            </Nav>
+
             <Nav className="me-2">
               {!userDetails && (
                 <Nav.Link href="/login" style={{ color: "white" }}>Login</Nav.Link>
